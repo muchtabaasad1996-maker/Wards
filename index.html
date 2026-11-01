@@ -1,794 +1,565 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
-    <!-- iOS App Support -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="ShiftSync">
-    <meta name="theme-color" content="#0b0c10">
-    
-    <title>ShiftSync - Medical Handover</title>
-    <!-- Tailwind CSS -->
+    <title>MedHandover | Clinical Ward Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        medical: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <!-- Docx.js for True Native Word Generation -->
+    <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0b0c10;
-        }
-        
-        /* Custom scrollbar for textareas and lists */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #2d313d;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #474d61;
-        }
-
-        .toast-enter {
-            animation: slideIn 0.3s ease-out forwards;
-        }
-        .toast-leave {
-            animation: slideOut 0.3s ease-in forwards;
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
+            transition: background-color 0.3s ease, color 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
         }
     </style>
 </head>
-<body class="text-gray-200 antialiased h-[100dvh] flex flex-col overflow-hidden">
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col justify-between">
 
-    <!-- Navbar (with iOS safe area padding at the top) -->
-    <header class="bg-[#14151b] border-b border-[#22252e] shadow-md z-10 flex-none pt-[env(safe-area-inset-top)]">
-        <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-14 sm:h-16 items-center">
-                <div class="flex items-center gap-2 shrink-0">
-                    <div class="bg-gradient-to-br from-[#445096] to-[#353e75] text-white p-1.5 sm:p-2 rounded-xl shadow-lg">
-                        <i class="fa-solid fa-staff-snake text-base sm:text-xl"></i>
-                    </div>
-                    <div class="flex flex-col justify-center">
-                        <h1 class="font-bold text-sm sm:text-xl text-gray-100 whitespace-nowrap leading-none mb-0.5">ShiftSync Handover</h1>
-                        <p class="text-[9px] sm:text-xs text-gray-400 font-medium tracking-wide uppercase whitespace-nowrap leading-none">Clinical Dashboard</p>
-                    </div>
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-xl flex items-center space-x-3">
+        <i class="fa-solid fa-circle-check text-xl"></i>
+        <span id="toast-message" class="font-medium">Action completed successfully!</span>
+    </div>
+
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center space-x-2.5 group">
+                <div class="w-9 h-9 rounded-xl bg-medical-500 flex items-center justify-center text-white shadow-lg shadow-medical-500/30 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-stethoscope text-lg"></i>
                 </div>
-                <div class="flex items-center gap-2 sm:gap-4 shrink-0">
-                    <div id="auth-status" class="hidden sm:flex items-center gap-2 text-sm text-gray-400 bg-[#1a1c23] border border-[#22252e] px-3 py-1.5 rounded-full">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i> Connecting...
-                    </div>
-                    <button onclick="toggleForm()" class="md:hidden bg-[#445096] hover:bg-[#5260b5] text-white px-2.5 py-1.5 sm:p-2 rounded-xl transition-colors text-xs sm:text-sm font-medium whitespace-nowrap flex items-center gap-1.5 shadow-lg shadow-[#445096]/20">
-                        <i class="fa-solid fa-plus"></i> Add
-                    </button>
-                </div>
+                <span class="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">Med<span class="text-medical-500">Handover</span></span>
+            </a>
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="exportToWord()" title="Export Cases as Word Document" class="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold transition-colors">
+                    <i class="fa-solid fa-file-word text-blue-500 text-base"></i>
+                    <span class="hidden sm:inline">Export Word</span>
+                </button>
+                <button onclick="toggleDarkMode()" aria-label="Toggle Dark Mode" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <i id="theme-icon" class="fa-solid fa-moon text-slate-600 dark:text-yellow-400"></i>
+                </button>
+                <button onclick="openModal()" class="inline-flex items-center px-4 py-2 rounded-xl bg-medical-500 hover:bg-medical-600 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-medical-500/30 transition-all hover:scale-105 whitespace-nowrap">
+                    <i class="fa-solid fa-plus mr-1.5"></i> Add Patient
+                </button>
             </div>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 gap-6 relative">
-        
-        <!-- Left Column: Add Patient Form -->
-        <aside id="form-container" class="hidden md:flex w-full md:w-1/3 flex-col bg-[#14151b] border border-[#22252e] md:rounded-2xl shadow-xl overflow-hidden fixed md:relative z-50 md:z-0 inset-0 md:inset-auto md:h-full pb-[env(safe-area-inset-bottom)]">
-            <div class="p-4 border-b border-[#22252e] bg-[#1a1c23] flex justify-between items-center">
-                <h2 class="font-semibold text-gray-100 flex items-center gap-2">
-                    <i class="fa-solid fa-user-plus text-[#a37d57]"></i> New Admission
-                </h2>
-                <button onclick="toggleForm()" class="md:hidden text-gray-500 hover:text-gray-300">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+    <main class="flex-grow max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center">
+                    <i class="fa-solid fa-bed-pulse text-medical-500 mr-2.5"></i> Ward & ER Patient Handover
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Manage and transfer active surgical & emergency patient records seamlessly.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="px-3 py-1.5 rounded-xl bg-medical-50 dark:bg-medical-900/40 text-medical-600 dark:text-medical-400 text-xs font-bold border border-medical-500/20">
+                    <span id="patient-count">0</span> Active Cases
+                </span>
+            </div>
+        </div>
+
+        <div id="patients-container" class="space-y-4"></div>
+
+        <div id="empty-state" class="hidden text-center py-16 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 p-8 space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-full bg-medical-50 dark:bg-medical-900/40 text-medical-500 flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-user-injured"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white">No active handover patients</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-xs sm:text-sm max-w-sm mx-auto">Get started by clicking the "Add Patient" button above to record ward or ER admissions.</p>
+            <button onclick="openModal()" class="px-5 py-2.5 bg-medical-500 hover:bg-medical-600 text-white font-semibold rounded-xl text-sm shadow-md transition">
+                Add First Patient
+            </button>
+        </div>
+    </main>
+
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-12 text-center text-xs text-slate-500">
+        <p>&copy; 2026 MedHandover Clinical Dashboard. Designed for iOS & Web.</p>
+    </footer>
+
+    <div id="patient-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-700 relative my-auto max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700 mb-4">
+                <h3 id="modal-title" class="text-xl font-bold text-slate-900 dark:text-white flex items-center">
+                    <i class="fa-solid fa-user-plus text-medical-500 mr-2"></i> Add New Patient Handover
+                </h3>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-4 pb-24 md:pb-4 custom-scrollbar">
-                <form id="patient-form" class="space-y-4">
-                    <!-- Basics -->
-                    <div class="space-y-3 bg-[#1a1c23] p-4 rounded-2xl border border-[#22252e]">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Patient Name *</label>
-                            <input type="text" id="p-name" required class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all" placeholder="John Doe">
-                        </div>
-                        <div class="flex gap-3">
-                            <div class="w-1/2">
-                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Age *</label>
-                                <input type="number" id="p-age" required min="0" max="150" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all" placeholder="e.g. 45">
-                            </div>
-                            <div class="w-1/2">
-                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Gender *</label>
-                                <select id="p-gender" required class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all">
-                                    <option value="" disabled selected>Select</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Ward / Dept *</label>
-                            <select id="p-ward" required class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all">
-                                <option value="" disabled selected>Select Department</option>
-                                <option value="ER">Emergency Room (ER)</option>
-                                <option value="ICU">Intensive Care Unit (ICU)</option>
-                                <option value="Internal Medicine">Internal Medicine</option>
-                                <option value="Surgery">Surgery</option>
-                                <option value="Pediatrics">Pediatrics</option>
-                                <option value="OB/GYN">OB/GYN</option>
-                                <option value="Other">Other</option>
+            <form id="patient-form" onsubmit="handleSavePatient(event)" class="space-y-4 overflow-y-auto pr-1 flex-grow">
+                <input type="hidden" id="patient-id">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Patient Legal Name</label>
+                        <input type="text" id="p-name" required placeholder="e.g., John Smith / علي حسن" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Age & Gender</label>
+                        <div class="flex space-x-2">
+                            <input type="number" id="p-age" required placeholder="Age" class="w-20 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                            <select id="p-gender" class="flex-grow px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                                <option value="Male">Male ♂</option>
+                                <option value="Female">Female ♀</option>
                             </select>
                         </div>
-                        <div class="flex gap-3">
-                            <div class="w-1/2">
-                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Primary Physician</label>
-                                <input type="text" id="p-physician" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all" placeholder="Dr. Name">
-                            </div>
-                            <div class="w-1/2">
-                                <label class="block text-xs font-semibold text-red-400/80 uppercase tracking-wider mb-1">Allergies</label>
-                                <input type="text" id="p-allergies" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-red-900/30 text-gray-100 rounded-xl focus:ring-2 focus:ring-red-500/50 outline-none transition-all" placeholder="e.g. Penicillin">
-                                <div class="flex flex-wrap gap-1.5 mt-1.5">
-                                    <button type="button" onclick="addSuggestion('p-allergies', 'NKDA')" class="text-[9px] font-medium bg-[#22252e] text-gray-300 px-2 py-0.5 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">NKDA</button>
-                                </div>
-                            </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Location / Ward</label>
+                        <select id="p-location" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                            <option value="ER">Emergency Room (ER)</option>
+                            <option value="Surgical Ward">Surgical Ward</option>
+                            <option value="ICU">Intensive Care Unit (ICU)</option>
+                            <option value="Step-Down">Step-Down Unit</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Primary Physician</label>
+                        <input type="text" id="p-physician" placeholder="e.g., Dr. Aljanabi" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Chief Complaint / Presenting Illness</label>
+                    <textarea id="p-complaint" rows="2" required placeholder="Enter chief complaint..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm"></textarea>
+                    <div class="flex flex-wrap gap-1.5 mt-1.5">
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Chest Pain')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Chest Pain</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Shortness of Breath')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Shortness of Breath</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Acute Abdominal Pain')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Abdominal Pain</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Headache & Dizziness')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Headache</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Trauma / Fall')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Trauma</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Past Medical History (PMH)</label>
+                        <input type="text" id="p-pmh" placeholder="HTN, DM, Asthma..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <button type="button" onclick="appendSuggestion('p-pmh', 'HTN')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">HTN</button>
+                            <button type="button" onclick="appendSuggestion('p-pmh', 'Type II Diabetes')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">DM II</button>
+                            <button type="button" onclick="appendSuggestion('p-pmh', 'Asthma')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">Asthma</button>
+                            <button type="button" onclick="setFieldValue('p-pmh', 'None')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium text-slate-400">None</button>
                         </div>
                     </div>
-
-                    <!-- Clinical Details -->
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Chief Complaint *</label>
-                            <input type="text" id="p-cc" required class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all" placeholder="e.g., Chest pain for 2 hours">
-                            <div class="flex flex-wrap gap-1.5 mt-2">
-                                <button type="button" onclick="addSuggestion('p-cc', 'Chest pain')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Chest pain</button>
-                                <button type="button" onclick="addSuggestion('p-cc', 'SOB')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">SOB</button>
-                                <button type="button" onclick="addSuggestion('p-cc', 'Abdominal pain')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Abd pain</button>
-                                <button type="button" onclick="addSuggestion('p-cc', 'Fever')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Fever</button>
-                                <button type="button" onclick="addSuggestion('p-cc', 'Headache')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Headache</button>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Past Medical History (PMH)</label>
-                            <textarea id="p-pmh" rows="2" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Chronic illnesses, DM, HTN..."></textarea>
-                            <div class="flex flex-wrap gap-1.5 mt-2">
-                                <button type="button" onclick="addSuggestion('p-pmh', 'None')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">None</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'DM')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">DM</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'HTN')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">HTN</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'IHD')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">IHD</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'Asthma')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Asthma</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'CKD')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">CKD</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'Thyroid')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Thyroid</button>
-                                <button type="button" onclick="addSuggestion('p-pmh', 'Migraines')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Migraines</button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Past Surgical History (PSH)</label>
-                            <textarea id="p-psh" rows="2" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Previous surgeries, dates..."></textarea>
-                            <div class="flex flex-wrap gap-1.5 mt-2">
-                                <button type="button" onclick="addSuggestion('p-psh', 'None')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">None</button>
-                                <button type="button" onclick="addSuggestion('p-psh', 'Appendectomy')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Appendectomy</button>
-                                <button type="button" onclick="addSuggestion('p-psh', 'Cholecystectomy')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Cholecystectomy</button>
-                                <button type="button" onclick="addSuggestion('p-psh', 'C-Section')" class="text-[10px] font-medium bg-[#22252e] text-gray-300 px-2.5 py-1 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">C-Section</button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Current Medications</label>
-                            <textarea id="p-meds" rows="2" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Medication, Dose, Frequency..."></textarea>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Family History</label>
-                                <textarea id="p-family" rows="2" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Heart Disease, Cancer..."></textarea>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Social History</label>
-                                <textarea id="p-social" rows="2" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Smoking, Alcohol..."></textarea>
-                                <div class="flex flex-wrap gap-1.5 mt-1.5">
-                                    <button type="button" onclick="addSuggestion('p-social', 'Smoker')" class="text-[9px] font-medium bg-[#22252e] text-gray-300 px-2 py-0.5 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Smoker</button>
-                                    <button type="button" onclick="addSuggestion('p-social', 'Alcohol')" class="text-[9px] font-medium bg-[#22252e] text-gray-300 px-2 py-0.5 rounded-full hover:bg-[#2d313d] transition-colors border border-[#2d313d]">Alcohol</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Clinical Examination (O/E)</label>
-                            <textarea id="p-exam" rows="3" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Vitals, systemic examination findings..."></textarea>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Management Plan & Notes *</label>
-                            <textarea id="p-plan" required rows="3" class="w-full text-sm p-2.5 bg-[#0b0c10] border border-[#22252e] text-gray-100 rounded-xl focus:ring-2 focus:ring-[#445096] focus:border-[#445096] outline-none transition-all resize-none" placeholder="Labs requested, imaging, current meds, next steps..."></textarea>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Past Surgical History (PSH)</label>
+                        <input type="text" id="p-psh" placeholder="Appendectomy, Cholecystectomy..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <button type="button" onclick="appendSuggestion('p-psh', 'Appendectomy')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">Appendectomy</button>
+                            <button type="button" onclick="appendSuggestion('p-psh', 'Cesarean Section')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">C-Section</button>
+                            <button type="button" onclick="appendSuggestion('p-psh', 'Cholecystectomy')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">Cholecystectomy</button>
+                            <button type="button" onclick="setFieldValue('p-psh', 'None')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium text-slate-400">None</button>
                         </div>
                     </div>
-                    
-                    <div class="pt-4 pb-8 md:pb-2">
-                        <button type="button" onclick="submitPatient()" id="submit-btn" class="w-full bg-gradient-to-r from-[#c09263] to-[#996d42] hover:from-[#cda377] hover:to-[#a87a4d] text-white font-semibold py-3 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(192,146,99,0.39)] transition-all flex items-center justify-center gap-2 text-base">
-                            <i class="fa-solid fa-floppy-disk"></i> Save & Handover
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </aside>
+                </div>
 
-        <!-- Right Column: Patient List / Dashboard -->
-        <section class="flex-1 flex flex-col bg-[#14151b] border border-[#22252e] rounded-2xl shadow-xl overflow-hidden h-full">
-            <div class="p-4 border-b border-[#22252e] bg-[#1a1c23] flex justify-between items-center shrink-0">
-                <h2 class="font-semibold text-gray-100 flex items-center gap-2">
-                    <i class="fa-solid fa-list text-[#445096]"></i> Active Patients
-                </h2>
-                <div class="flex items-center gap-2">
-                    <div class="text-xs font-medium text-gray-300 bg-[#0b0c10] border border-[#22252e] px-3 py-1.5 rounded-full shadow-sm" id="patient-count">
-                        0 Patients
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Allergies</label>
+                        <input type="text" id="p-allergies" placeholder="Penicillin, Peanuts, None..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
                     </div>
-                    <button onclick="exportToWord()" title="Export to Word Document" class="text-gray-400 hover:text-gray-100 bg-[#0b0c10] border border-[#22252e] px-2.5 py-1.5 rounded-lg shadow-sm transition-colors text-sm">
-                        <i class="fa-solid fa-file-word"></i>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Current Medications</label>
+                        <input type="text" id="p-medications" placeholder="Aspirin, Metformin..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Examination (O/E) & Vitals</label>
+                    <textarea id="p-exam" rows="2" placeholder="GCS 15/15, BP 120/80, HR 80, SpO2 98%..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Management Plan & Notes</label>
+                    <textarea id="p-plan" rows="2" placeholder="IV fluids, pending lab investigations, NPO..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm"></textarea>
+                </div>
+
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-700 flex space-x-3">
+                    <button type="button" onclick="closeModal()" class="w-1/2 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 font-semibold rounded-xl text-sm transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="w-1/2 py-3 bg-medical-500 hover:bg-medical-600 text-white font-bold rounded-xl shadow-lg shadow-medical-500/30 text-sm transition">
+                        Save & Handover
                     </button>
                 </div>
-            </div>
-            
-            <div class="flex-1 overflow-y-auto p-4 custom-scrollbar bg-[#0b0c10]/50" id="patients-container">
-                <!-- Loading State -->
-                <div id="loading-state" class="h-full flex flex-col items-center justify-center text-gray-500">
-                    <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-[#c09263]"></i>
-                    <p class="text-sm">Loading handover data...</p>
-                </div>
-                
-                <!-- Empty State -->
-                <div id="empty-state" class="hidden h-full flex flex-col items-center justify-center text-gray-500">
-                    <div class="bg-[#1a1c23] p-4 rounded-full shadow-lg border border-[#22252e] mb-4">
-                        <i class="fa-solid fa-clipboard-check text-4xl text-[#c09263]"></i>
-                    </div>
-                    <h3 class="text-lg font-medium text-gray-300 mb-1">Ward is Empty</h3>
-                    <p class="text-sm">No active patients. Add a patient to start the handover.</p>
-                </div>
+            </form>
+        </div>
+    </div>
 
-                <!-- Cards Grid -->
-                <div id="cards-grid" class="hidden grid grid-cols-1 xl:grid-cols-2 gap-4 pb-4">
-                    <!-- Cards injected here via JS -->
-                </div>
-            </div>
-        </section>
+    <script>
+        const STORAGE_KEY = 'med_handover_patients_v2';
+        let patients = [];
 
-    </main>
-
-    <!-- Toast Notifications Container -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
-
-    <!-- Firebase Configuration and Logic -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global Variables Environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'medsync-handover-default';
-        const rawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-        let firebaseConfig;
-        
-        try {
-            firebaseConfig = JSON.parse(rawConfig);
-            // --- YOUR FIREBASE CONFIG GOES HERE ---
-            // If you host this externally, replace this block with your Firebase config
-            // to enable real-time syncing between devices!
-            if(Object.keys(firebaseConfig).length === 0) {
-                firebaseConfig = {
-                    apiKey: "mock-key",
-                    projectId: "mock-project",
-                };
-            }
-        } catch (e) {
-            console.error("Config parse error", e);
-        }
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        let currentUser = null;
-        let isLocalMode = false;
-        let patientsList = [];
-        let unsubscribeSnapshot = null;
-
-        // UI Elements
-        const authStatusEl = document.getElementById('auth-status');
-        const loadingState = document.getElementById('loading-state');
-        const emptyState = document.getElementById('empty-state');
-        const cardsGrid = document.getElementById('cards-grid');
-        const patientCountEl = document.getElementById('patient-count');
-        const submitBtn = document.getElementById('submit-btn');
-        const formContainer = document.getElementById('form-container');
-
-        // Color mapping for wards
-        const wardColors = {
-            'ER': 'bg-red-500/10 text-red-400 border-red-500/20',
-            'ICU': 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-            'Internal Medicine': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-            'Surgery': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-            'Pediatrics': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-            'OB/GYN': 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-            'Other': 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-        };
-
-        // Auth Initialization
-        async function initAuth() {
-            try {
-                if (firebaseConfig.apiKey === "mock-key") {
-                    throw new Error("Missing real Firebase config. Using local fallback.");
+        function initApp() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    patients = JSON.parse(saved);
+                } catch(e) {
+                    patients = [];
                 }
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.warn("Authentication bypassed. Switching to Local Mode:", error);
-                isLocalMode = true;
-                currentUser = { uid: 'local-user' }; // Fake user for local mode
-                authStatusEl.innerHTML = `<i class="fa-solid fa-hard-drive text-amber-500"></i> Local Mode (No Sync)`;
-                showToast("Running locally. Add Firebase config to sync between devices.", "warning");
-                loadPatients(); // Trigger local load
-            }
-        }
-
-        // Listen to Auth State
-        onAuthStateChanged(auth, (user) => {
-            if (isLocalMode) return; // Skip if we already fell back to local mode
-            if (user) {
-                currentUser = user;
-                authStatusEl.innerHTML = `<i class="fa-solid fa-user-doctor text-[#c09263]"></i> Ready (ID: ${user.uid.substring(0, 5)}...)`;
-                loadPatients();
             } else {
-                currentUser = null;
-                authStatusEl.innerHTML = `<i class="fa-solid fa-link-slash text-red-500"></i> Disconnected`;
-                if(unsubscribeSnapshot) unsubscribeSnapshot();
+                patients = [
+                    {
+                        id: '1',
+                        name: 'علي حسن (Ali Hasan)',
+                        age: 34,
+                        gender: 'Male',
+                        location: 'ER',
+                        physician: 'Dr. Aljanabi',
+                        complaint: 'Chest pain and mild shortness of breath upon exertion.',
+                        pmh: 'HTN',
+                        psh: 'Appendectomy',
+                        allergies: 'None known',
+                        medications: 'Aspirin 81mg',
+                        exam: 'BP 130/85, HR 88 bpm, SpO2 98% on room air. Chest clear.',
+                        plan: 'ECG done, cardiac enzymes pending, maintain IV access.'
+                    }
+                ];
+                saveToLocalStorage();
             }
-        });
+            renderPatients();
+        }
 
-        // Initialize App
-        initAuth();
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
+        }
 
-        // Data Fetching and Listener
-        function loadPatients() {
-            if (!currentUser) return;
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = 'fa-solid fa-moon text-slate-600';
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                icon.className = 'fa-solid fa-sun text-yellow-400';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
 
-            if (isLocalMode) {
-                const stored = localStorage.getItem('shiftSyncPatients');
-                patientsList = stored ? JSON.parse(stored) : [];
-                patientsList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').className = 'fa-solid fa-sun text-yellow-400';
+        }
+
+        function appendSuggestion(fieldId, text) {
+            const el = document.getElementById(fieldId);
+            if (el.value.trim() === '') {
+                el.value = text;
+            } else {
+                el.value = el.value + ', ' + text;
+            }
+        }
+
+        function setFieldValue(fieldId, text) {
+            document.getElementById(fieldId).value = text;
+        }
+
+        function openModal(id = null) {
+            const modal = document.getElementById('patient-modal');
+            const form = document.getElementById('patient-form');
+            form.reset();
+            document.getElementById('patient-id').value = '';
+            
+            if (id) {
+                document.getElementById('modal-title').innerHTML = '<i class="fa-solid fa-user-pen text-medical-500 mr-2"></i> Edit Patient Handover';
+                const p = patients.find(item => item.id === id);
+                if (p) {
+                    document.getElementById('patient-id').value = p.id;
+                    document.getElementById('p-name').value = p.name || '';
+                    document.getElementById('p-age').value = p.age || '';
+                    document.getElementById('p-gender').value = p.gender || 'Male';
+                    document.getElementById('p-location').value = p.location || 'ER';
+                    document.getElementById('p-physician').value = p.physician || '';
+                    document.getElementById('p-complaint').value = p.complaint || '';
+                    document.getElementById('p-pmh').value = p.pmh || '';
+                    document.getElementById('p-psh').value = p.psh || '';
+                    document.getElementById('p-allergies').value = p.allergies || '';
+                    document.getElementById('p-medications').value = p.medications || '';
+                    document.getElementById('p-exam').value = p.exam || '';
+                    document.getElementById('p-plan').value = p.plan || '';
+                }
+            } else {
+                document.getElementById('modal-title').innerHTML = '<i class="fa-solid fa-user-plus text-medical-500 mr-2"></i> Add New Patient Handover';
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('patient-modal').classList.add('hidden');
+        }
+
+        function handleSavePatient(e) {
+            e.preventDefault();
+            const id = document.getElementById('patient-id').value;
+            const patientData = {
+                id: id ? id : Date.now().toString(),
+                name: document.getElementById('p-name').value,
+                age: document.getElementById('p-age').value,
+                gender: document.getElementById('p-gender').value,
+                location: document.getElementById('p-location').value,
+                physician: document.getElementById('p-physician').value,
+                complaint: document.getElementById('p-complaint').value,
+                pmh: document.getElementById('p-pmh').value,
+                psh: document.getElementById('p-psh').value,
+                allergies: document.getElementById('p-allergies').value,
+                medications: document.getElementById('p-medications').value,
+                exam: document.getElementById('p-exam').value,
+                plan: document.getElementById('p-plan').value
+            };
+
+            if (id) {
+                const index = patients.findIndex(item => item.id === id);
+                if (index !== -1) patients[index] = patientData;
+                showToast('Patient record updated successfully');
+            } else {
+                patients.unshift(patientData);
+                showToast('Patient added to handover list');
+            }
+
+            saveToLocalStorage();
+            renderPatients();
+            closeModal();
+        }
+
+        function deletePatient(id) {
+            if (confirm('Are you sure you want to remove this patient from the handover list?')) {
+                patients = patients.filter(p => p.id !== id);
+                saveToLocalStorage();
                 renderPatients();
+                showToast('Patient removed from list');
+            }
+        }
+
+        function renderPatients() {
+            const container = document.getElementById('patients-container');
+            const emptyState = document.getElementById('empty-state');
+            const countEl = document.getElementById('patient-count');
+
+            countEl.innerText = patients.length;
+
+            if (patients.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
                 return;
             }
 
-            // RULE 1: Strict Paths enforced here (Public Shared Data)
-            const patientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'patients');
+            emptyState.classList.add('hidden');
+            container.innerHTML = '';
 
-            // RULE 2: No Complex Queries. Fetch all, process locally.
-            unsubscribeSnapshot = onSnapshot(patientsRef, (snapshot) => {
-                patientsList = [];
-                snapshot.forEach((doc) => {
-                    patientsList.push({ id: doc.id, ...doc.data() });
-                });
-
-                // Local Sort: Newest first
-                patientsList.sort((a, b) => {
-                    const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt || 0);
-                    const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt || 0);
-                    return timeB - timeA;
-                });
-
-                renderPatients();
-            }, (error) => {
-                console.error("Firestore Listener Error:", error);
-                showToast("Failed to sync patients.", "error");
-            });
-        }
-
-        // Render Cards UI
-        function renderPatients() {
-            loadingState.classList.add('hidden');
-            
-            patientCountEl.textContent = `${patientsList.length} Patient${patientsList.length !== 1 ? 's' : ''}`;
-
-            if (patientsList.length === 0) {
-                emptyState.classList.remove('hidden');
-                cardsGrid.classList.add('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-                cardsGrid.classList.remove('hidden');
+            patients.forEach((p, index) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 space-y-4 transition-all hover:border-medical-500/50';
                 
-                cardsGrid.innerHTML = '';
-                
-                patientsList.forEach(patient => {
-                    const wardClass = wardColors[patient.ward] || wardColors['Other'];
-                    const genderIcon = patient.gender === 'Male' ? '<i class="fa-solid fa-mars text-blue-400"></i>' : 
-                                     (patient.gender === 'Female' ? '<i class="fa-solid fa-venus text-pink-400"></i>' : '');
-
-                    const allergyBadge = patient.allergies && patient.allergies.toUpperCase() !== 'NKDA' && patient.allergies.toLowerCase() !== 'none'
-                        ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-900/40 text-red-400 border border-red-800"><i class="fa-solid fa-triangle-exclamation"></i> Allergy: ${escapeHTML(patient.allergies)}</span>`
-                        : (patient.allergies ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#1a1c23] text-gray-400 border border-[#22252e]">Allergies: ${escapeHTML(patient.allergies)}</span>` : '');
-
-                    const card = document.createElement('div');
-                    card.className = "bg-[#16171d] border border-[#22252e] rounded-2xl shadow-lg overflow-hidden flex flex-col hover:border-[#383d4f] transition-all duration-200";
-                    
-                    card.innerHTML = `
-                        <div class="p-4 border-b border-[#22252e] flex justify-between items-start gap-4">
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700">
+                        <div class="flex items-center space-x-3">
+                            <span class="w-8 h-8 rounded-xl bg-medical-50 dark:bg-medical-900/40 text-medical-600 dark:text-medical-400 font-bold text-xs flex items-center justify-center">#${index + 1}</span>
                             <div>
-                                <div class="flex items-center gap-2 mb-1">
-                                    <h3 class="font-bold text-gray-100 text-lg leading-none">${escapeHTML(patient.name)}</h3>
-                                    ${genderIcon}
-                                </div>
-                                <div class="text-sm text-gray-400 font-medium mt-2 flex flex-wrap gap-2 items-center">
-                                    <span>${patient.age} y/o</span>
-                                    <span>•</span>
-                                    <span class="px-2.5 py-1 rounded-md text-xs border font-semibold ${wardClass}">${escapeHTML(patient.ward)}</span>
-                                    ${patient.physician ? `<span>• Dr. ${escapeHTML(patient.physician)}</span>` : ''}
-                                    ${allergyBadge}
+                                <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center">
+                                    ${escapeHtml(p.name)} <span class="ml-2 font-normal text-xs text-slate-500">${p.gender === 'Male' ? '♂' : '♀'}, ${p.age} y/o</span>
+                                </h3>
+                                <div class="flex items-center space-x-2 mt-0.5">
+                                    <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] font-bold rounded-full">${escapeHtml(p.location)}</span>
+                                    ${p.physician ? `<span class="text-xs text-slate-400">• Attending: ${escapeHtml(p.physician)}</span>` : ''}
                                 </div>
                             </div>
-                            <button onclick="window.removePatient('${patient.id}')" title="Discharge / Remove" class="text-gray-500 hover:text-red-400 transition-colors p-1 bg-[#1a1c23] rounded-lg border border-[#22252e]">
-                                <i class="fa-solid fa-sign-out-alt text-lg"></i>
+                        </div>
+                        <div class="flex items-center space-x-2 self-end sm:self-auto">
+                            <button onclick="openModal('${p.id}')" title="Edit Patient" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs transition">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deletePatient('${p.id}')" title="Delete Patient" class="p-2 rounded-lg bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-600 text-xs transition">
+                                <i class="fa-solid fa-trash"></i>
                             </button>
                         </div>
-                        
-                        <div class="p-4 flex-1 space-y-4 text-sm">
-                            <div>
-                                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-triangle-exclamation text-[#c09263]"></i> Chief Complaint</h4>
-                                <p class="text-gray-200 font-medium bg-[#1a1c23] p-2.5 rounded-xl border border-[#22252e]">${escapeHTML(patient.cc)}</p>
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left"></i> PMH</h4>
-                                    <p class="text-gray-300 line-clamp-3 bg-[#111216] p-2 rounded-lg border border-[#1a1c23] min-h-[42px]">${escapeHTML(patient.pmh) || '<span class="text-gray-600 italic">None</span>'}</p>
-                                </div>
-                                <div>
-                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-scalpel"></i> PSH</h4>
-                                    <p class="text-gray-300 line-clamp-3 bg-[#111216] p-2 rounded-lg border border-[#1a1c23] min-h-[42px]">${escapeHTML(patient.psh) || '<span class="text-gray-600 italic">None</span>'}</p>
-                                </div>
-                            </div>
+                    </div>
 
-                            ${patient.meds || patient.family || patient.social ? `
-                            <div class="grid grid-cols-3 gap-3">
-                                ${patient.meds ? `<div>
-                                    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><i class="fa-solid fa-pills"></i> Meds</h4>
-                                    <p class="text-gray-400 text-xs bg-[#111216] p-1.5 rounded-lg border border-[#1a1c23]">${escapeHTML(patient.meds)}</p>
-                                </div>` : ''}
-                                ${patient.family ? `<div>
-                                    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><i class="fa-solid fa-users"></i> Family Hx</h4>
-                                    <p class="text-gray-400 text-xs bg-[#111216] p-1.5 rounded-lg border border-[#1a1c23]">${escapeHTML(patient.family)}</p>
-                                </div>` : ''}
-                                ${patient.social ? `<div>
-                                    <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1"><i class="fa-solid fa-martini-glass"></i> Social Hx</h4>
-                                    <p class="text-gray-400 text-xs bg-[#111216] p-1.5 rounded-lg border border-[#1a1c23]">${escapeHTML(patient.social)}</p>
-                                </div>` : ''}
-                            </div>
-                            ` : ''}
-
-                            <div>
-                                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-stethoscope"></i> Examination (O/E)</h4>
-                                <p class="text-gray-300 bg-[#1a1c23] p-2.5 rounded-xl border border-[#22252e]">${escapeHTML(patient.exam) || '<span class="text-gray-600 italic">No examination details</span>'}</p>
-                            </div>
-
-                            <div>
-                                <h4 class="text-xs font-bold text-[#6272c7] uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-clipboard-list"></i> Plan & Notes</h4>
-                                <p class="text-gray-100 bg-[#1e2235] p-2.5 rounded-xl border border-[#2d3454] font-medium whitespace-pre-wrap">${escapeHTML(patient.plan)}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div class="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl space-y-1">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-medical-600 dark:text-medical-400 block"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Chief Complaint</span>
+                            <p class="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">${escapeHtml(p.complaint)}</p>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl space-y-1">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-medical-600 dark:text-medical-400 block"><i class="fa-solid fa-notes-medical mr-1"></i> History & Vitals</span>
+                            <div class="text-slate-700 dark:text-slate-300 text-xs space-y-0.5">
+                                <p><strong>PMH:</strong> ${escapeHtml(p.pmh || 'None')} | <strong>PSH:</strong> ${escapeHtml(p.psh || 'None')}</p>
+                                <p><strong>Allergies:</strong> ${escapeHtml(p.allergies || 'None')} | <strong>Meds:</strong> ${escapeHtml(p.medications || 'None')}</p>
                             </div>
                         </div>
-                    `;
-                    cardsGrid.appendChild(card);
-                });
-            }
-        }
+                    </div>
 
-        // Global functions for inline HTML event handlers
-        window.submitPatient = async function() {
-            if (!currentUser) {
-                showToast("Not authenticated.", "error");
-                return;
-            }
+                    ${p.exam ? `
+                    <div class="text-xs space-y-1">
+                        <span class="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Examination (O/E):</span>
+                        <p class="text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/20 p-2.5 rounded-lg">${escapeHtml(p.exam)}</p>
+                    </div>` : ''}
 
-            // Validations
-            const name = document.getElementById('p-name').value.trim();
-            const age = document.getElementById('p-age').value;
-            const gender = document.getElementById('p-gender').value;
-            const ward = document.getElementById('p-ward').value;
-            const physician = document.getElementById('p-physician').value.trim();
-            const allergies = document.getElementById('p-allergies').value.trim();
-            const cc = document.getElementById('p-cc').value.trim();
-            const pmh = document.getElementById('p-pmh').value.trim();
-            const psh = document.getElementById('p-psh').value.trim();
-            const meds = document.getElementById('p-meds').value.trim();
-            const family = document.getElementById('p-family').value.trim();
-            const social = document.getElementById('p-social').value.trim();
-            const exam = document.getElementById('p-exam').value.trim();
-            const plan = document.getElementById('p-plan').value.trim();
-
-            if (!name || !age || !gender || !ward || !cc || !plan) {
-                showToast("Please fill in all required fields (*)", "warning");
-                return;
-            }
-
-            const patientData = {
-                name,
-                age: Number(age),
-                gender,
-                ward,
-                physician,
-                allergies,
-                cc,
-                pmh,
-                psh,
-                meds,
-                family,
-                social,
-                exam,
-                plan,
-                addedBy: currentUser.uid,
-                createdAt: isLocalMode ? Date.now() : serverTimestamp()
-            };
-
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...`;
-            submitBtn.disabled = true;
-
-            try {
-                if (isLocalMode) {
-                    const newPatient = { ...patientData, id: 'local_' + Date.now() };
-                    patientsList.push(newPatient);
-                    localStorage.setItem('shiftSyncPatients', JSON.stringify(patientsList));
-                    loadPatients();
-                } else {
-                    const patientsRef = collection(db, 'artifacts', appId, 'public', 'data', 'patients');
-                    await addDoc(patientsRef, patientData);
-                }
-                
-                showToast("Patient added to handover list.", "success");
-                document.getElementById('patient-form').reset();
-                
-                // Hide form on mobile after submission
-                if(window.innerWidth < 768) {
-                    formContainer.classList.add('hidden');
-                    formContainer.classList.remove('flex');
-                }
-            } catch (error) {
-                console.error("Error adding document: ", error);
-                showToast("Failed to add patient.", "error");
-            } finally {
-                submitBtn.innerHTML = originalBtnText;
-                submitBtn.disabled = false;
-            }
-        };
-
-        window.removePatient = async function(docId) {
-            if (!currentUser) return;
-            
-            // Custom confirmation (no alert/confirm allowed per rules)
-            // Creating a simple modal inline
-            const confirmDelete = confirmModal("Discharge Patient", "Are you sure you want to remove this patient from the active list?", async () => {
-                try {
-                    if (isLocalMode) {
-                        patientsList = patientsList.filter(p => p.id !== docId);
-                        localStorage.setItem('shiftSyncPatients', JSON.stringify(patientsList));
-                        loadPatients();
-                    } else {
-                        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'patients', docId);
-                        await deleteDoc(docRef);
-                    }
-                    showToast("Patient removed successfully.", "success");
-                } catch (error) {
-                    console.error("Error deleting document: ", error);
-                    showToast("Failed to remove patient.", "error");
-                }
-            });
-        };
-
-        window.toggleForm = function() {
-            if (formContainer.classList.contains('hidden')) {
-                formContainer.classList.remove('hidden');
-                formContainer.classList.add('flex');
-            } else {
-                formContainer.classList.add('hidden');
-                formContainer.classList.remove('flex');
-            }
-        };
-
-        window.exportToWord = function() {
-            if (patientsList.length === 0) {
-                showToast("No patients to export.", "warning");
-                return;
-            }
-
-            let htmlContent = `
-                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                <head>
-                    <meta charset="utf-8">
-                    <title>ShiftSync Handover</title>
-                    <style>
-                        body { font-family: 'Inter', Arial, sans-serif; }
-                        h2 { color: #1e293b; text-align: center; }
-                        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-                        th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; vertical-align: top; }
-                        th { background-color: #f1f5f9; color: #334155; font-weight: bold; }
-                        td { color: #475569; }
-                    </style>
-                </head>
-                <body>
-                    <h2>Clinical Handover - ${new Date().toISOString().split('T')[0]}</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Patient Name</th>
-                                <th>Age / Gender</th>
-                                <th>Ward / Physician</th>
-                                <th>Allergies</th>
-                                <th>Chief Complaint</th>
-                                <th>Medical/Surgical/Family/Social Hx</th>
-                                <th>Current Meds</th>
-                                <th>Examination (O/E)</th>
-                                <th>Management Plan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            patientsList.forEach(p => {
-                htmlContent += `
-                    <tr>
-                        <td><strong>${escapeHTML(p.name)}</strong></td>
-                        <td>${escapeHTML(p.age)} y/o ${escapeHTML(p.gender)}</td>
-                        <td>${escapeHTML(p.ward)}<br>${escapeHTML(p.physician) ? `Dr. ${escapeHTML(p.physician)}` : ''}</td>
-                        <td style="color: red;">${escapeHTML(p.allergies) || 'None'}</td>
-                        <td>${escapeHTML(p.cc)}</td>
-                        <td>
-                            <strong>PMH:</strong> ${escapeHTML(p.pmh) || 'None'}<br>
-                            <strong>PSH:</strong> ${escapeHTML(p.psh) || 'None'}<br>
-                            <strong>Family:</strong> ${escapeHTML(p.family) || 'None'}<br>
-                            <strong>Social:</strong> ${escapeHTML(p.social) || 'None'}
-                        </td>
-                        <td>${escapeHTML(p.meds) || 'None'}</td>
-                        <td>${escapeHTML(p.exam) || 'None'}</td>
-                        <td>${escapeHTML(p.plan)}</td>
-                    </tr>
+                    ${p.plan ? `
+                    <div class="text-xs space-y-1">
+                        <span class="font-semibold text-medical-600 dark:text-medical-400 uppercase tracking-wider text-[10px]">Management Plan:</span>
+                        <p class="text-slate-700 dark:text-slate-300 bg-medical-50/50 dark:bg-medical-900/10 p-2.5 rounded-lg border border-medical-500/10">${escapeHtml(p.plan)}</p>
+                    </div>` : ''}
                 `;
+                container.appendChild(card);
             });
+        }
 
-            htmlContent += `
-                        </tbody>
-                    </table>
-                </body>
-                </html>
-            `;
-
-            // Use application/msword and prepend UTF-8 BOM so Arabic/special characters are preserved
-            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `ShiftSync_Handover_${new Date().toISOString().split('T')[0]}.doc`;
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            showToast("Exported to Word successfully!", "success");
-        };
-
-        window.addSuggestion = function(fieldId, text) {
-            const field = document.getElementById(fieldId);
-            if (!field) return;
-            
-            // If selecting "None", clear everything else and just put "None"
-            if (text === 'None') {
-                field.value = 'None';
-                field.focus();
+        function exportToWord() {
+            if (patients.length === 0) {
+                showToast('No patient records available to export.');
                 return;
             }
 
-            // Append logic for other suggestions
-            let currentValue = field.value.trim();
-            if (currentValue === '' || currentValue === 'None') {
-                field.value = text;
-            } else {
-                if (currentValue.endsWith(',')) {
-                    field.value = currentValue + ' ' + text;
-                } else {
-                    field.value = currentValue + ', ' + text;
-                }
-            }
-            field.focus();
-        };
+            // Create Word Document Elements using docx.js
+            const children = [
+                new docx.Paragraph({ 
+                    text: "Clinical Ward Handover Report", 
+                    heading: docx.HeadingLevel.HEADING_1,
+                    alignment: docx.AlignmentType.CENTER
+                }),
+                new docx.Paragraph({ text: `Generated Date: ${new Date().toLocaleString()}`, spacing: { after: 100 } }),
+                new docx.Paragraph({ text: `Total Active Cases: ${patients.length}`, spacing: { after: 300 } }),
+            ];
 
-        // Utility: Escape HTML to prevent XSS
-        function escapeHTML(str) {
-            if (!str) return '';
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+            patients.forEach((p, index) => {
+                children.push(new docx.Paragraph({ 
+                    text: `Case #${index + 1}: ${p.name} (${p.gender}, ${p.age} y/o)`, 
+                    heading: docx.HeadingLevel.HEADING_2,
+                    spacing: { before: 400, after: 150 }
+                }));
+
+                // Helper to add lines with bold labels
+                const addLine = (label, value) => {
+                    children.push(new docx.Paragraph({
+                        children: [
+                            new docx.TextRun({ text: `${label}: `, bold: true }),
+                            new docx.TextRun(value || 'None')
+                        ],
+                        spacing: { after: 50 }
+                    }));
+                };
+
+                addLine("Location / Ward", p.location);
+                if (p.physician) addLine("Attending Physician", p.physician);
+                addLine("Chief Complaint", p.complaint);
+                addLine("Past Medical History (PMH)", p.pmh);
+                addLine("Past Surgical History (PSH)", p.psh);
+                addLine("Allergies", p.allergies);
+                addLine("Current Medications", p.medications);
+                addLine("Examination (O/E)", p.exam || 'N/A');
+                addLine("Management Plan", p.plan || 'N/A');
+                
+                children.push(new docx.Paragraph({ text: "" })); // Empty line between cases
+            });
+
+            // Assemble the document
+            const doc = new docx.Document({
+                sections: [{
+                    properties: {},
+                    children: children
+                }]
+            });
+
+            // Generate binary blob and trigger share/download
+            docx.Packer.toBlob(doc).then(blob => {
+                const filename = `Patient_Handover_${new Date().toISOString().slice(0, 10)}.docx`;
+                
+                // Try Native Share API first (Best for iOS/iPhone and Android)
+                try {
+                    const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        navigator.share({
+                            files: [file],
+                            title: 'Patient Handover',
+                            text: 'Clinical Ward Handover Report'
+                        }).then(() => {
+                            showToast('Document shared successfully!');
+                        }).catch((err) => {
+                            console.log('User cancelled share or share failed:', err);
+                        });
+                        return; // Exit function if share is successful
+                    }
+                } catch (e) {
+                    console.log("Web Share API not supported/failed, falling back to download link.");
+                }
+
+                // Fallback for Desktop computers or older browsers
+                try {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 300);
+                    
+                    showToast('Word document exported successfully!');
+                } catch (err) {
+                    console.error("Export failed: ", err);
+                    showToast('Export failed. Check browser permissions.');
+                }
+            });
         }
 
-        // Custom Toast Notification System
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            msgEl.innerText = message;
             
-            let icon = '';
-            let colors = '';
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
             
-            if (type === 'success') {
-                icon = '<i class="fa-solid fa-circle-check text-emerald-500"></i>';
-                colors = 'bg-[#1a1c23] border-[#22252e] text-gray-200';
-            } else if (type === 'error') {
-                icon = '<i class="fa-solid fa-circle-xmark text-red-500"></i>';
-                colors = 'bg-[#1a1c23] border-[#22252e] text-gray-200';
-            } else {
-                icon = '<i class="fa-solid fa-circle-exclamation text-[#c09263]"></i>';
-                colors = 'bg-[#1a1c23] border-[#22252e] text-gray-200';
-            }
-
-            toast.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl ${colors} min-w-[250px]`;
-            toast.innerHTML = `
-                ${icon}
-                <span class="text-sm font-medium flex-1">${message}</span>
-                <button onclick="this.parentElement.remove()" class="text-gray-500 hover:text-gray-300"><i class="fa-solid fa-xmark"></i></button>
-            `;
-
-            container.appendChild(toast);
-
             setTimeout(() => {
-                if(container.contains(toast)) {
-                    toast.classList.replace('toast-enter', 'toast-leave');
-                    setTimeout(() => toast.remove(), 300);
-                }
-            }, 4000);
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
         }
 
-        // Custom Confirm Modal
-        function confirmModal(title, message, onConfirm) {
-            const overlay = document.createElement('div');
-            overlay.className = "fixed inset-0 bg-[#0b0c10]/80 z-50 flex items-center justify-center backdrop-blur-sm px-4";
-            
-            const modal = document.createElement('div');
-            modal.className = "bg-[#16171d] border border-[#22252e] rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-[slideIn_0.2s_ease-out]";
-            
-            modal.innerHTML = `
-                <h3 class="text-lg font-bold text-gray-100 mb-2">${title}</h3>
-                <p class="text-sm text-gray-400 mb-6">${message}</p>
-                <div class="flex justify-end gap-3">
-                    <button id="modal-cancel" class="px-4 py-2 text-sm font-medium text-gray-300 bg-[#22252e] hover:bg-[#2d313d] rounded-xl transition-colors">Cancel</button>
-                    <button id="modal-confirm" class="px-4 py-2 text-sm font-medium text-white bg-red-500/80 hover:bg-red-500 rounded-xl transition-colors border border-red-600/50">Discharge</button>
-                </div>
-            `;
-            
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            document.getElementById('modal-cancel').onclick = () => {
-                document.body.removeChild(overlay);
-            };
-
-            document.getElementById('modal-confirm').onclick = () => {
-                document.body.removeChild(overlay);
-                onConfirm();
-            };
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#039;');
         }
 
+        window.onload = initApp;
     </script>
 </body>
 </html>
